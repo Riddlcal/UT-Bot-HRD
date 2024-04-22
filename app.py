@@ -4,9 +4,7 @@ from langchain_community.vectorstores import Chroma
 from langchain_openai import ChatOpenAI
 from langchain.chains import ConversationalRetrievalChain
 from langchain.memory import ConversationBufferMemory
-from langchain.prompts import (ChatPromptTemplate, 
-                               SystemMessagePromptTemplate, 
-                               HumanMessagePromptTemplate)
+from langchain.prompts import PromptTemplate
 from bs4 import BeautifulSoup
 import dotenv
 import os
@@ -27,49 +25,51 @@ dotenv.load_dotenv()
 
 CHROMA_PATH = 'chroma_data'
 
-db = Chroma(
-    persist_directory=CHROMA_PATH,
-    embedding_function=OpenAIEmbeddings(),
-)
-
-# CHATBOT SET UP
-retriever = db.as_retriever(search_type="similarity", search_kwargs={"k": 3})
-openai_api_key = os.getenv("OPENAI_API_KEY")
-
-general_system_template = r"""
+# Prompt template for our conversational retrieval chain
+custom_prompt_template = """
 You are an AI chatbot named UT BOT.
 
+Use the following pieces of information to answer the user's question.
+Your primary goal is to provide accurate information about the Human Resource Development Department at University of Texas at Tyler provided the context.
+Be respectful, and format the answer well.
+Add contect info if the response contains a faculty member.
+Also add helpful links to the responses when useful.
+Do not make up links that don't exist, only use the links you are provided with.
+If you don't know the answer, just say that you don't know and give them a helpful
+contact information that will help them or a link that will help, don't try to make up an answer.
 
-Your primary goal is to provide accurate information about the Human Resources Development at University of Texas at Tyler provided the context.
+Context: {context} 
+Question: {question}
 
-
-
----- {context} ----
-
+Only return the helpful answer and nothing else.
+Helpful answer: 
 """
 
-general_user_template = "Question:```{question}```"
+## Creating our prompt
+prompt = PromptTemplate(template=custom_prompt_template,
+                            input_variables=['context', 'question'])
 
-messages = [
-            SystemMessagePromptTemplate.from_template(general_system_template),
-            HumanMessagePromptTemplate.from_template(general_user_template)
-]
-
-prompt = ChatPromptTemplate.from_messages(messages=messages)
-
+#  Initialize our LLM model
+llm = ChatOpenAI(temperature=0, model="gpt-3.5-turbo-0125")
+#  Memory for Chat History
 memory = ConversationBufferMemory(memory_key='chat_history', return_messages=True, output_key='answer')
 
-llm = ChatOpenAI(temperature=0,openai_api_key=openai_api_key,model_name="gpt-3.5-turbo-0125")
+# Initialize embeddings
+embeddings = OpenAIEmbeddings(model='text-embedding-3-large', show_progress_bar=True)
 
+# Initialize our Chroma vector store
+vectorstore =  Chroma(persist_directory=CHROMA_PATH
+                ,embedding_function=embeddings)
 
-qa = ConversationalRetrievalChain.from_llm(
+# Create our conversational chain
+qa_chain = ConversationalRetrievalChain.from_llm(
     llm = llm,
-    retriever = retriever,
+    retriever = vectorstore.as_retriever(search_type="similarity",search_kwargs={'k': 2}),
     memory = memory,
     combine_docs_chain_kwargs={'prompt': prompt},
     chain_type="stuff",
     return_source_documents=True,
-)  
+    )  
 
 ## RUN THE APPLICATION
 @app.route('/')
@@ -79,7 +79,7 @@ def home():
 @app.route('/ask', methods=['POST'])
 def ask():
     user_input = request.form['question']
-    result = qa.invoke({"question": user_input, "chat_history": {}})
+    result = qa_chain.invoke({"question": user_input, "chat_history": {}})
     bot_response = result['answer']
 
     # Remove labels like '[Label]' from the answer
@@ -139,4 +139,4 @@ def ask():
 
 # Run the Flask app
 if __name__ == '__main__':
-    app.run(debug=True)
+    app.run(debug=False)
