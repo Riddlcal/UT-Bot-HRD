@@ -50,7 +50,7 @@ prompt = PromptTemplate(template=custom_prompt_template,
                             input_variables=['context', 'question'])
 
 #  Initialize our LLM model
-llm = ChatOpenAI(temperature=0, model="gpt-3.5-turbo-0125")
+llm = ChatOpenAI(temperature=0, model="gpt-4-turbo-2024-04-09")
 #  Memory for Chat History
 memory = ConversationBufferMemory(memory_key='chat_history', return_messages=True, output_key='answer')
 
