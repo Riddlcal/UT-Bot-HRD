@@ -40,9 +40,9 @@ general_system_template = r"""
 
 Your primary goal is to provide accurate information about the Human Resources Development at University of Texas at Tyler provided the context.
 ---- {context} ----
+"""
 
 general_user_template = "Question:```{question}```"
-"""
 
 messages = [
             SystemMessagePromptTemplate.from_template(general_system_template),
