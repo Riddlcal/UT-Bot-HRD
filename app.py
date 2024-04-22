@@ -52,6 +52,11 @@ messages = [
 prompt = ChatPromptTemplate.from_messages(messages=messages)
 
 llm = ChatOpenAI(temperature=0,openai_api_key=openai_api_key,model_name="gpt-3.5-turbo-0125")
+#  Memory for Chat History
+memory = ConversationBufferMemory(memory_key='chat_history', return_messages=True, output_key='answer')
+
+# Initialize embeddings
+embeddings = OpenAIEmbeddings(model='text-embedding-3-large', show_progress_bar=True)
 
 qa = ConversationalRetrievalChain.from_llm(
   llm = llm,
